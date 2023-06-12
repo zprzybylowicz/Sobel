@@ -1,0 +1,387 @@
+#include <iostream>
+#include <stdio.h>
+#include <fstream>
+#include <stdlib.h>
+#include <string>
+#include <cstdlib>
+
+using namespace std;
+typedef struct
+{
+    char bfType[2];
+    unsigned long  bfSize;
+    unsigned short bfReserved1;
+    unsigned short bfReserved2;
+    unsigned long   bfOffBits;
+} BITMAPFILEHEADER;
+
+typedef struct
+{
+    unsigned long   biSize;
+    unsigned long   biWidth;
+    unsigned long   biHeight;
+    unsigned short biPlanes;
+    unsigned short biBitCount;
+    unsigned long  biCompression;
+    unsigned long  biSizeImage;
+    unsigned long   biXPelsPerMeter;
+    unsigned long   biYPelsPerMeter;
+    unsigned long  biClrUsed;
+    unsigned long  biClrImportant;
+} BITMAPINFOHEADER;
+
+ struct RGB{
+    unsigned char   rgbBlue;
+    unsigned char  rgbGreen;
+    unsigned char  rgbRed;
+
+ };
+int odczytajBFH(ifstream& ifs, BITMAPFILEHEADER& bfh);
+void odczytajBFO(ifstream& ifs, BITMAPINFOHEADER& bfo);
+void daneobrazka(BITMAPINFOHEADER& bfo, BITMAPFILEHEADER& bfh);
+void operatorsobel(RGB** tab,BITMAPINFOHEADER& bfo, BITMAPFILEHEADER& bfh,long dlpix, long szpix);
+void czytajobraz(RGB** tab, long dlpix, long szpix,ifstream &ifs);
+void zapisywanienewbmp(RGB** tab,BITMAPINFOHEADER& bfo, BITMAPFILEHEADER& bfh, long dlpix, long szpix );
+int main()
+{
+    BITMAPFILEHEADER bfh;
+    BITMAPINFOHEADER bfo;
+
+    string nazwa;
+    cout<< "Podaj nazwe pliku do odczytu: ";
+    cin>> nazwa;
+    ifstream ifs(nazwa, ios::in | ios::binary);
+    if (ifs.good())
+    {
+        cout << "otwarto plik!" << endl;
+        
+    
+    
+        
+        odczytajBFH(ifs, bfh);
+        odczytajBFO(ifs, bfo);
+        long dlpix = bfo.biHeight; //dlugosc obrazka w pixelach
+        long szpix = bfo.biWidth;// szerokosc obrazka w pixelach
+
+    
+        if (szpix% 4 == 0) {//dopisywanie zer do wiersza jezeli potrzeba
+         szpix = szpix;
+        } else{
+            do{
+                 szpix = szpix + 1;
+                }        while (szpix % 4 == 0);
+          }
+    
+    RGB** tab = new RGB * [dlpix];//tablica na kolorki rgb
+    for (int j = 0; j < dlpix; j++) {
+        tab[j] = new RGB[szpix];
+        
+    }
+    for(int h=0;h<dlpix;h++)
+        for (int e = 0; e < szpix; e++) {
+            tab[h][e].rgbBlue = 0;
+            tab[h][e].rgbRed = 0;
+            tab[h][e].rgbGreen = 0;
+        }
+  
+    
+    daneobrazka(bfo, bfh);
+ 
+    czytajobraz(tab, dlpix, szpix, ifs);
+    operatorsobel(tab, bfo, bfh, dlpix,  szpix);
+    zapisywanienewbmp(tab,bfo, bfh, dlpix, szpix);  
+    for (int k = 0; k <dlpix ; k++){
+        delete[]tab[k];
+    }
+    delete[]tab;
+   }
+    ifs.close();
+    return 0;
+}
+
+
+int odczytajBFH(ifstream& ifs, BITMAPFILEHEADER& bfh)
+{
+    ifs.read(reinterpret_cast<char*>(&bfh.bfType), 2);
+    ifs.read(reinterpret_cast<char*>(&bfh.bfSize), 4);
+    ifs.read(reinterpret_cast<char*>(&bfh.bfReserved1), 2);
+    ifs.read(reinterpret_cast<char*>(&bfh.bfReserved2), 2);
+    ifs.read(reinterpret_cast<char*>(&bfh.bfOffBits), 4);
+    return ifs.tellg();
+
+
+}
+void odczytajBFO(ifstream& ifs, BITMAPINFOHEADER& bfo) {
+    ifs.read(reinterpret_cast<char*>(&bfo.biSize), 4);
+    ifs.read(reinterpret_cast<char*>(&bfo.biWidth), 4);
+    ifs.read(reinterpret_cast<char*>(&bfo.biHeight), 4);
+    ifs.read(reinterpret_cast<char*>(&bfo.biPlanes), 2);
+    ifs.read(reinterpret_cast<char*>(&bfo.biBitCount), 2);
+    ifs.read(reinterpret_cast<char*>(&bfo.biCompression), 4);
+    ifs.read(reinterpret_cast<char*>(&bfo.biSizeImage), 4);
+    ifs.read(reinterpret_cast<char*>(&bfo.biXPelsPerMeter), 4);
+    ifs.read(reinterpret_cast<char*>(&bfo.biYPelsPerMeter), 4);
+    ifs.read(reinterpret_cast<char*>(&bfo.biClrUsed), 4);
+    ifs.read(reinterpret_cast<char*>(&bfo.biClrImportant), 4);
+
+
+
+
+}
+void daneobrazka(BITMAPINFOHEADER& bfo, BITMAPFILEHEADER& bfh)
+{
+    cout << " BITMAPFILEHEADER" << endl;
+    cout << "Sygnatura pliku, âśBMâ dla prawidÅowego pliku BMP" << "   " << bfh.bfType[0] << bfh.bfType[1] << endl;
+    cout << "Dlugosc caÅego pliku w bajtach:  " << bfh.bfSize << endl;
+    cout << "Pole zarezerwowane (zwykle zero)" << "   " << bfh.bfReserved1 << endl;
+    cout << "Pole zarezerwowane (zwykle zero)" << "   " << bfh.bfReserved2 << endl;
+    cout << "Pozycja danych obrazowych w pliku:  " << bfh.bfOffBits << endl;
+    cout << "BITMAPINFOHEADER" << endl;
+    cout << "rozmiar naglowka informacyjnego" << "   " << bfo.biSize << endl;
+    cout << "szerokosc obrazu w pikselach" << "   " << bfo.biWidth << endl;
+    cout << "wysokosc obrazu w pikselach" << "   " << bfo.biHeight << endl;
+    cout << "LIczba platow" << bfo.biPlanes << "   " << endl;
+    cout << "LIczba bitow na piksel" << "   " << bfo.biBitCount << endl;
+    cout << "Algorytm kompresyjny" << "   " << bfo.biCompression << endl;
+    cout << "Rozmiar rysunku" << "   " << bfo.biSizeImage << endl;
+    cout << "Rodzielczosc pozioma" << "   " << bfo.biXPelsPerMeter << endl;
+    cout << "Rodzielczosc pionowa" << "   " << bfo.biYPelsPerMeter << endl;
+    cout << "Liczba kolorow w palecie" << "   " << bfo.biClrUsed << endl;
+    cout << "Liczba waznych kolorow w palecie" << "   " << bfo.biClrImportant << endl;
+}
+
+void operatorsobel(RGB** tab, BITMAPINFOHEADER& bfo, BITMAPFILEHEADER& bfh, long dlpix, long szpix)
+{
+    int kolor;
+     const int liczbamasek = 8;
+     const int szerokosc= 3;
+     const int wysokosc = 3;
+    int sobel[wysokosc][szerokosc][liczbamasek];//tablica potrojna dla 8 masek
+    sobel[0][0][0] = -1;
+    sobel[1][0][0] = -2;
+    sobel[2][0][0] = -1;
+    sobel[0][1][0] = 0;
+    sobel[1][1][0] = 0;
+    sobel[2][1][0] = 0;
+    sobel[0][2][0] = 1;
+    sobel[1][2][0] = 2;
+    sobel[2][2][0] = 1;
+    sobel[0][0][1] = 0;
+    sobel[1][0][1] = -1;
+    sobel[2][0][1] = -2;
+    sobel[0][1][1] = 1;
+    sobel[1][1][1] = 0;
+    sobel[2][1][1] = -1;
+    sobel[0][2][1] = 2;
+    sobel[1][2][1] = 1;
+    sobel[2][2][1] = 0;
+    sobel[0][0][2] = 1;
+    sobel[1][0][2] = 0;
+    sobel[2][0][2] = -1;
+    sobel[0][1][2] = 2;
+    sobel[1][1][2] = 0;
+    sobel[2][1][2] = -2;
+    sobel[0][2][2] = 1;
+    sobel[1][2][2] = 0;
+    sobel[2][2][2] = -1;
+    sobel[0][0][3] = 2;
+    sobel[1][0][3] = 1;
+    sobel[2][0][3] = 0;
+    sobel[0][1][3] = 1;
+    sobel[1][1][3] = 0;
+    sobel[2][1][3] = -1;
+    sobel[0][2][3] = 0;
+    sobel[1][2][3] = -1;
+    sobel[2][2][3] = -2;
+    sobel[0][0][4] = 1;
+    sobel[1][0][4] = 2;
+    sobel[2][0][4] = 1;
+    sobel[0][1][4] = 0;
+    sobel[1][1][4] = 0;
+    sobel[2][1][4] = 0;
+    sobel[0][2][4] =-1;
+    sobel[1][2][4] = -2;
+    sobel[2][2][4] = -1;
+    sobel[0][0][5] = 0;
+    sobel[1][0][5] = 1;
+    sobel[2][0][5] = 2;
+    sobel[0][1][5] = -1;
+    sobel[1][1][5] = 0;
+    sobel[2][1][5] = 1;
+    sobel[0][2][5] = -2;
+    sobel[1][2][5] = -1;
+    sobel[2][2][5] = 0;
+    sobel[0][0][6] = -1;
+    sobel[1][0][6] = 0;
+    sobel[2][0][6] = 1;
+    sobel[0][1][6] = -2;
+    sobel[1][1][6] = 0;
+    sobel[2][1][6] = 2;
+    sobel[0][2][6] = -1;
+    sobel[1][2][6] = 0;
+    sobel[2][2][6] = 1;
+    sobel[0][0][7] = -2;
+    sobel[1][0][7] = -1;
+    sobel[2][0][7] = 0;
+    sobel[0][1][7] = -1;
+    sobel[1][1][7] = 0;
+    sobel[2][1][7] = 1;
+    sobel[0][2][7] = 0;
+    sobel[1][2][7] = 1;
+    sobel[2][2][7] = 2;
+
+    int** blue = new int* [dlpix];//nowa tablica na skladowa niebieska 
+    for (int g = 0; g < dlpix; g++) {
+        blue[g] = new int[szpix];
+    }
+   
+    int** red = new int* [dlpix];//nowa tablica na skladowa czerwona
+    for (int j = 0; j < dlpix; j++) {
+        red[j] = new int[szpix];
+    }
+   
+    int** green = new int* [dlpix];//nowa tablica na skladowa zielona
+    for (int j = 0; j < dlpix; j++) {
+        green[j] = new int[szpix];
+    }
+    for (int j = 0; j < dlpix; j++)
+    {
+        for (int h = 0; h < szpix; h++) {
+            green[j][h] = tab[j][h].rgbGreen;
+            blue[j][h] = tab[j][h].rgbBlue; 
+            red[j][h] = tab[j][h].rgbRed;
+        }
+    }
+ 
+    for (int k = 0; k < dlpix; k++) {//sobel dla niebieskiego
+        for (int e = 0; e < szpix; e++) {
+            kolor = 0;
+            if (e + 2 >= szpix || k + 2 >= dlpix) {}//zeby maska nie wyszla z obrazka
+            else {
+                for (int h = 0; h < 8; h++) { 
+                    kolor = kolor + (sobel[0][0][h] * blue[k][e]) +(sobel[0][1][h] * blue[k][e+1]) +
+                        (sobel[0][2][h] * blue[k][e+2]) +(sobel[1][0][h] * blue[k+1][e]) +
+                        (sobel[1][1][h] * blue[k + 1][e + 1]) +(sobel[1][2][h] * blue[k + 1][e + 2]) +
+                        (sobel[2][0][h] * blue[k+2][e ]) +(sobel[2][1][h] * blue[k + 2][e + 1]) +
+                        (sobel[2][2][h] * blue[k + 2][e + 2]);
+
+                    if (kolor < 0) {
+                        kolor = 0;
+                    }
+                    
+                } 
+                kolor = kolor / 8;
+                tab[k + 1][e + 1].rgbBlue = kolor;
+            }
+
+        }
+    }
+
+    for (int k = 0; k < dlpix; k++) {//sobel dla czerwonego
+        for (int e = 0; e < szpix; e++) {
+            kolor = 0;
+            if (e + 2 >= szpix || k + 2 >= dlpix) {}
+            else {
+                for (int h = 0; h < 8; h++) {
+                    kolor = kolor + (sobel[0][0][h] * red[k][e]) +(sobel[0][1][h] * red[k][e + 1]) +
+                        (sobel[0][2][h] * red[k][e + 2]) +(sobel[1][0][h] * red[k + 1][e]) +
+                        (sobel[1][1][h] * red[k + 1][e + 1]) +(sobel[1][2][h] * red[k + 1][e + 2]) +
+                        (sobel[2][0][h] * red[k+2][e ]) +(sobel[2][1][h] * red[k + 2][e+1]) +
+                        (sobel[2][2][h] * red[k + 2][e + 2]);
+                    if (kolor < 0) {
+                        kolor = 0;
+                    }
+                }
+                    kolor = kolor / 8;
+                    tab[k + 1][e + 1].rgbRed = kolor;
+            }
+        }
+    }
+        for (int k = 0; k < dlpix; k++) {//sobel dla zielonego
+            for (int e = 0; e < szpix; e++) {
+                kolor = 0;
+                if (e + 2 >= szpix || k + 2 >= dlpix) {}
+                else {
+                    for (int h = 0; h < 8; h++) {
+                        kolor = kolor + (sobel[0][0][h] * green[k][e]) +(sobel[0][1][h] * green[k][e + 1]) +
+                            (sobel[0][2][h] * green[k][e + 2]) +(sobel[1][0][h] * green[k + 1][e]) +
+                            (sobel[1][1][h] * green[k + 1][e + 1]) +(sobel[1][2][h] * green[k + 1][e + 2]) +
+                            (sobel[2][0][h] * green[k+ 2][e ]) +(sobel[2][1][h] * green[k + 2][e + 1]) +
+                            (sobel[2][2][h] * green[k + 2][e + 2]);
+                        if (kolor < 0) {
+                            kolor = 0;
+                        }
+                    }  
+                    kolor = kolor / 8;
+                    tab[k + 1][e + 1].rgbGreen = kolor;
+
+                }
+            }
+        }
+        
+       
+      
+     
+ }
+
+
+    
+void czytajobraz(RGB**tab, long dlpix, long szpix,ifstream &ifs)
+{
+    unsigned short pixel = 0;
+        for (int k = 0; k < dlpix; k++) {
+            for (int w = 0; w < szpix; w++) {
+
+                ifs.read(reinterpret_cast<char*>(&pixel), 1);
+                tab[k][w].rgbBlue = pixel;
+                pixel = 0;
+                ifs.read(reinterpret_cast<char*>(&pixel), 1);
+                tab[k][w].rgbGreen = pixel;
+                pixel = 0;
+                ifs.read(reinterpret_cast<char*>(&pixel), 1);
+                tab[k][w].rgbRed = pixel;
+                pixel = 0;
+                
+            }
+            
+        }
+}
+void zapisywanienewbmp(RGB**tab,BITMAPINFOHEADER& bfo, BITMAPFILEHEADER& bfh, long dlpix, long szpix)
+{
+    string nowe;
+    cout << "Podaj nazwÄ nowego pliku" << endl;
+    cin >> nowe;
+    fstream ofs(nowe, ios::out|ios::binary);
+    unsigned short pixel = 0;
+    ofs.write(reinterpret_cast<char*>(&bfh.bfType), 2);
+    ofs.write(reinterpret_cast<char*>(&bfh.bfSize), 4);
+    ofs.write(reinterpret_cast<char*>(&bfh.bfReserved1), 2);
+    ofs.write(reinterpret_cast<char*>(&bfh.bfReserved2), 2);
+    ofs.write(reinterpret_cast<char*>(&bfh.bfOffBits), 4);
+    ofs.write(reinterpret_cast<char*>(&bfo.biSize), 4);
+    ofs.write(reinterpret_cast<char*>(&bfo.biWidth), 4);
+    ofs.write(reinterpret_cast<char*>(&bfo.biHeight), 4);
+    ofs.write(reinterpret_cast<char*>(&bfo.biPlanes), 2);
+    ofs.write(reinterpret_cast<char*>(&bfo.biBitCount), 2);
+    ofs.write(reinterpret_cast<char*>(&bfo.biCompression), 4);
+    ofs.write(reinterpret_cast<char*>(&bfo.biSizeImage), 4);
+    ofs.write(reinterpret_cast<char*>(&bfo.biXPelsPerMeter), 4);
+    ofs.write(reinterpret_cast<char*>(&bfo.biYPelsPerMeter), 4);
+    ofs.write(reinterpret_cast<char*>(&bfo.biClrUsed), 4);
+    ofs.write(reinterpret_cast<char*>(&bfo.biClrImportant), 4);
+    
+     for (int k = 0; k < dlpix; k++) {
+        for (int w = 0; w < szpix; w++) {
+            int pixel = 0; 
+            pixel = tab[k][w].rgbBlue;
+            ofs.write(reinterpret_cast<char*>(&pixel), 1);
+            pixel = tab[k][w].rgbGreen;
+            ofs.write(reinterpret_cast<char*>(&pixel), 1);
+           pixel = tab[k][w].rgbRed;
+            ofs.write(reinterpret_cast<char*>(&pixel), 1);
+
+        }
+
+    }
+     ofs.close();
+}
