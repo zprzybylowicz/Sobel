@@ -1,5 +1,5 @@
 # Sobel
-The program reads a bitmap image file, performs the Sobel edge detection algorithm on the image, and saves the result as a new bitmap file. The program uses structures to store the bitmap file header and info header, and defines a struct for RGB color values.
+The program is done in c++ and reads a bitmap image file, performs the Sobel edge detection algorithm on the image, and saves the result as a new bitmap file. The program uses structures to store the bitmap file header and info header, and defines a struct for RGB color values.
 
 The `main` function is the entry point of the program. It prompts the user to enter the filename of the bitmap image to process.
 
